@@ -8,7 +8,7 @@ import (
    "github.com/umahmood/macvendors"
 )
 
-type macVendor struct {
+type MacVendor struct {
    lowlevel *macvendors.API
    lock sync.Mutex
    cache map[string]string
@@ -27,7 +27,7 @@ var (
    }
 )
 
-func (m *macVendor) Lookup(mac string) string {
+func (m *MacVendor) Lookup(mac string) (string, error) {
    prefix := mac[:8]
 
    m.lock.Lock()
@@ -37,18 +37,19 @@ func (m *macVendor) Lookup(mac string) string {
    if !ok {
       name, err := m.lowlevel.Name(prefix)
       if err != nil {
-         panic(err)
+         return "", err
       }
 
       m.cache[prefix] = name
       serialised, err := json.Marshal(m.cache)
       if err != nil {
-         panic(err)
+         return "", err
       }
 
       err = os.WriteFile(cachePath, serialised, 0644)
       if err != nil {
          panic(err)
+         return "", err
       }
 
       vendor = name
@@ -59,28 +60,28 @@ func (m *macVendor) Lookup(mac string) string {
       vendor2 = vendor
    }
 
-   return vendor2
+   return vendor2, nil
 }
 
-func New() macVendor {
+func New() (*MacVendor, error) {
    cacheDir, err := os.UserCacheDir()
    if err != nil {
-      panic(err)
+      return nil, err
    }
 
    cachePath = cacheDir + "/macvendor.json"
-   inst := macVendor{lowlevel: macvendors.New()}
+   inst := MacVendor{lowlevel: macvendors.New()}
 
    serialised, err := os.ReadFile(cachePath)
    // FIXME check for os.IsNotExists error
    if err == nil {
       err = json.Unmarshal(serialised, &inst.cache)
       if err != nil {
-         panic(err)
+         return nil, err
       }
    } else {
       inst.cache = map[string]string{}
    }
 
-   return inst
+   return &inst, nil
 }
